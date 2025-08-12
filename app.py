@@ -402,11 +402,10 @@ def calendar():
 
     events = []
     for row in rows:
-        end_date = datetime.strptime(row["end_date"], "%Y-%m-%d") + timedelta(days=1)
         events.append({
             "title": row["username"],
             "start": row["start_date"],
-            "end": end_date.strftime("%Y-%m-%d")
+            "end": row["end_date"]
         })
 
     return render_template("calendar.html", events=events)
@@ -415,7 +414,10 @@ def calendar():
 def get_events():
     conn = get_db_connection()
     urlopy = conn.execute("""
-        SELECT u.start_date, u.end_date, users.username
+        SELECT 
+            strftime('%Y-%m-%d', u.start_date) as start_date,
+            strftime('%Y-%m-%d', u.end_date) as end_date,
+            users.username
         FROM urlopy u
         JOIN users ON users.id = u.user_id
     """).fetchall()
@@ -426,7 +428,7 @@ def get_events():
         events.append({
             "title": f"{u['username']}",
             "start": u["start_date"],
-            "end": u["end_date"],
+            "end": (datetime.strptime(u["end_date"], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d"),
             "color": "blue"
         })
     return jsonify(events)
