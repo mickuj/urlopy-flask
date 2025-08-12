@@ -3,7 +3,7 @@ import sqlite3
 from init_db import get_db
 from flask import g
 from functools import wraps
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 import os
 
 app = Flask(__name__)
@@ -44,7 +44,7 @@ def add_leave():
 
     users = []
     if role == 'admin':
-        users = conn.execute("SELECT id, username FROM users WHERE role != 'admin'").fetchall()
+        users = conn.execute("SELECT id, username FROM users WHERE role != 'admin' ORDER BY username").fetchall()
 
     if request.method == 'POST':
         start = request.form['start_date']
@@ -104,14 +104,18 @@ def vacations():
         return redirect(url_for('login'))
 
     user_id, role = get_current_user()
+
+    today = date.today().isformat()
+
     conn = get_db_connection()
     rows = conn.execute('''
         SELECT u.id, u.user_id, u.start_date, u.end_date,
                COALESCE(us.username, 'użytkownik') AS username
         FROM urlopy u
         LEFT JOIN users us ON us.id = u.user_id
+        WHERE u.end_date >= ?
         ORDER BY u.start_date
-    ''').fetchall()
+    ''', (today,)).fetchall()
     conn.close()
     return render_template(
         'vacations.html',
@@ -239,7 +243,7 @@ def users_list():
         return redirect(url_for("login"))
 
     conn = get_db_connection()
-    rows = conn.execute('SELECT id, username, role, total_days FROM users ORDER BY username').fetchall()
+    rows = conn.execute('SELECT id, username, role, total_days FROM users ORDER BY username COLLATE NOCASE').fetchall()
     conn.close()
     return render_template('users.html', users=rows)
 
@@ -398,10 +402,11 @@ def calendar():
 
     events = []
     for row in rows:
+        end_date = datetime.strptime(row["end_date"], "%Y-%m-%d") + timedelta(days=1)
         events.append({
             "title": row["username"],
             "start": row["start_date"],
-            "end": row["end_date"]
+            "end": end_date.strftime("%Y-%m-%d")
         })
 
     return render_template("calendar.html", events=events)
