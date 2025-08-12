@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Statystyki urlopów</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">📊 Statystyki urlopów</h2>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="{{ url_for('vacations') }}">← Urlopy</a>
+        </div>
+    </div>
+
+  <div class="mb-3">
+    <h4>📅 Urlopy trwające dzisiaj:</h4>
+    <ul class="list-group">
+      {% for row in today %}
+        <li class="list-group-item">{{ row[0] }}</li>
+      {% else %}
+        <li class="list-group-item">Brak</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="mb-3">
+    <h4>📋 Pozostałe dni urlopowe:</h4>
+    <ul class="list-group">
+      {% for user, days in available_days %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          {{ user }}
+          <span class="badge bg-success rounded-pill">{{ days }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+
+  <div class="mb-3">
+    <strong>📆 Nadchodzących urlopów (w ciągu 30 dni):</strong> {{ upcoming }}
+  </div>
+</body>
+</html>
