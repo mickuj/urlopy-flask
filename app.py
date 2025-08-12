@@ -105,7 +105,7 @@ def vacations():
 
     user_id, role = get_current_user()
 
-    today = date.today().isformat()
+    today = date.today().isoformat()
 
     conn = get_db_connection()
     rows = conn.execute('''
