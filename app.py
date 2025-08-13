@@ -34,6 +34,21 @@ def admin_only(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def add_yearly_vacation_days():
+    current_year = datetime.today().year
+    conn = get_db_connection()
+    conn.execute("""
+        UPDATE users
+        SET total_days = total_days + 26,
+            last_updated_year = ?
+        WHERE username != 'admin' AND last_updated_year < ?
+    """, (current_year, current_year))
+    conn.commit()
+    conn.close()
+
+add_yearly_vacation_days()
+
+
 @app.route('/add_leave', methods=['GET', 'POST'])
 def add_leave():
     if not login_required():
@@ -276,8 +291,8 @@ def users_new():
             total_days = 26
         total_days = int(total_days)
 
-        conn.execute('INSERT INTO users (username, password, role, total_days) VALUES (?, ?, ?, ?)',
-                    (username, password, role, total_days))
+        conn.execute('INSERT INTO users (username, password, role, total_days, last_updated_year) VALUES (?, ?, ?, ?, ?)',
+                    (username, password, role, total_days, datetime.today().year))
 
         conn.commit()
         conn.close()
