@@ -321,6 +321,7 @@ def users_edit(user_id):
         role = request.form['role'].strip()
         new_password = request.form.get('password', '').strip()
         total_days = request.form.get('total_days')
+        annual_limit = request.form.get('annual_limit')
 
 
         if role not in ('admin','employee'):
@@ -328,20 +329,28 @@ def users_edit(user_id):
             flash("Nieprawidłowa rola.", "danger")
             return redirect(url_for('users_edit', user_id=user_id))
 
+        updates = []
+        params = []
+
+        if new_password:
+            updates.append('password = ?')
+            params.append(new_password)
+
         if total_days:
-            total_days = int(total_days)
-            if new_password:
-                conn.execute('UPDATE users SET role = ?, password = ?, total_days = ? WHERE id = ?',
-                            (role, new_password, total_days, user_id))
-            else:
-                conn.execute('UPDATE users SET role = ?, total_days = ? WHERE id = ?',
-                            (role, total_days, user_id))
-        else:
-            if new_password:
-                conn.execute('UPDATE users SET role = ?, password = ? WHERE id = ?',
-                            (role, new_password, user_id))
-            else:
-                conn.execute('UPDATE users SET role = ? WHERE id = ?', (role, user_id))
+            updates.append('total_days = ?')
+            params.append(int(total_days))
+
+        if annual_limit:
+            updates.append('annual_limit = ?')
+            params.append(int(annual_limit))
+
+        updates.append('role = ?')
+        params.append(role)
+
+        params.append(user_id)
+
+        sql = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
+        conn.execute(sql, params)
 
         conn.commit()
         conn.close()
