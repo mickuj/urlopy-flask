@@ -259,7 +259,7 @@ def users_list():
         return redirect(url_for("login"))
 
     conn = get_db_connection()
-    rows = conn.execute('SELECT id, username, role, total_days FROM users ORDER BY username COLLATE NOCASE').fetchall()
+    rows = conn.execute('SELECT id, username, role, total_days, annual_limit FROM users ORDER BY username COLLATE NOCASE').fetchall()
     conn.close()
     return render_template('users.html', users=rows)
 
@@ -311,7 +311,7 @@ def users_edit(user_id):
 
 
     conn = get_db_connection()
-    user = conn.execute('SELECT id, username, role, total_days FROM users WHERE id = ?', (user_id,)).fetchone()
+    user = conn.execute('SELECT id, username, role, total_days, annual_limit FROM users WHERE id = ?', (user_id,)).fetchone()
 
     if not user:
         conn.close()

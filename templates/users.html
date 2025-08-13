@@ -34,6 +34,7 @@
         <th style="font-family: 'Mulish', sans-serif;">Login</th>
         <th style="font-family: 'Mulish', sans-serif;">Rola</th>
         <th style="font-family: 'Mulish', sans-serif;">Dni urlopowe</th>
+        <th style="font-family: 'Mulish', sans-serif;">Limit roczny</th>
         <th class="text-end" style="font-family: 'Mulish', sans-serif;">Akcje</th>
       </tr>
     </thead>
@@ -43,6 +44,7 @@
         <td style="font-family: 'Mulish', sans-serif;">{{ u['username'] }}</td>
         <td style="font-family: 'Mulish', sans-serif;">{{ u['role'] }}</td>
         <td style="font-family: 'Mulish', sans-serif;">{{ u['total_days'] }}</td>
+        <td style="font-family: 'Mulish', sans-serif;">{{ u['annual_limit'] }}</td>
         <td class="text-end">
             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('users_edit', user_id=u['id']) }}" style="font-family: 'Mulish', sans-serif;">Edytuj / Reset hasła</a>
 
