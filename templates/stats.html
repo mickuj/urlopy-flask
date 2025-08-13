@@ -32,10 +32,10 @@
   <div class="mb-3">
     <h4 style="font-family: 'Mulish', sans-serif;">📆 Pozostałe dni urlopowe:</h4>
     <ul class="list-group">
-      {% for user, days in available_days %}
+      {% for user in available_days %}
         <li class="list-group-item d-flex justify-content-between align-items-center" style="font-family: 'Mulish', sans-serif;">
-          {{ user }}
-          <span class="badge bg-success rounded-pill" style="font-family: 'Mulish', sans-serif;">{{ days }}</span>
+          {{ user.username }}
+          <span class="badge bg-success rounded-pill" style="font-family: 'Mulish', sans-serif;">{{ user.total_days }}</span>
         </li>
       {% endfor %}
     </ul>
