@@ -1,5 +1,6 @@
 from flask import Flask, render_template, redirect, request, abort, url_for, session, flash, jsonify
-import sqlite3
+import psycopg2
+import psycopg2.extras
 from init_db import get_db
 from flask import g
 from functools import wraps
@@ -10,11 +11,10 @@ import random
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tajny_klucz'
 
-DATABASE = 'database.db'
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     return conn
 
 def get_current_user():
@@ -41,8 +41,8 @@ def add_yearly_vacation_days():
     conn.execute("""
         UPDATE users
         SET total_days = total_days + annual_limit,
-            last_updated_year = ?
-        WHERE username != 'admin' AND last_updated_year < ?
+            last_updated_year = %s
+        WHERE username != 'admin' AND last_updated_year < %s
     """, (current_year, current_year))
     conn.commit()
     conn.close()
@@ -81,7 +81,7 @@ def add_leave():
         days_taken = (end_date - start_date).days + 1
 
         current_days = conn.execute(
-            'SELECT total_days FROM users WHERE id = ?', (selected_user_id,)
+            'SELECT total_days FROM users WHERE id = %s', (selected_user_id,)
         ).fetchone()['total_days']
 
         if current_days < days_taken:
@@ -90,12 +90,12 @@ def add_leave():
             return redirect(url_for("add_leave"))
 
         conn.execute(
-            'INSERT INTO urlopy (user_id, start_date, end_date) VALUES (?, ?, ?)',
+            'INSERT INTO urlopy (user_id, start_date, end_date) VALUES (%s, %s, %s)',
             (selected_user_id, start, end)
         )
 
         conn.execute(
-            'UPDATE users SET total_days = total_days - ? WHERE id = ?',
+            'UPDATE users SET total_days = total_days - %s WHERE id = %s',
             (days_taken, selected_user_id)
         )
 
@@ -105,7 +105,7 @@ def add_leave():
 
     # Pokaż dotychczasowe urlopy (dla danego użytkownika)
     leaves = conn.execute(
-        'SELECT start_date, end_date FROM urlopy WHERE user_id = ? ORDER BY start_date',
+        'SELECT start_date, end_date FROM urlopy WHERE user_id = %s ORDER BY start_date',
         (user_id,)
     ).fetchall()
     conn.close()
@@ -129,7 +129,7 @@ def vacations():
                COALESCE(us.username, 'użytkownik') AS username
         FROM urlopy u
         LEFT JOIN users us ON us.id = u.user_id
-        WHERE u.end_date >= ?
+        WHERE u.end_date >= %s
         ORDER BY u.start_date
     ''', (today,)).fetchall()
     conn.close()
@@ -148,7 +148,7 @@ def edit_leave(leave_id):
 
     user_id, role = get_current_user()
     conn = get_db_connection()
-    row = conn.execute('SELECT * FROM urlopy WHERE id = ?', (leave_id,)).fetchone()
+    row = conn.execute('SELECT * FROM urlopy WHERE id = %s', (leave_id,)).fetchone()
     if not row:
         conn.close(); abort(404)
 
@@ -174,12 +174,12 @@ def edit_leave(leave_id):
 
         diff = old_days - new_days
         conn.execute(
-            'UPDATE users SET total_days = total_days + ? WHERE id = ?',
+            'UPDATE users SET total_days = total_days + %s WHERE id = %s',
             (diff, row['user_id'])
         )
 
         conn.execute(
-            'UPDATE urlopy SET start_date = ?, end_date = ? WHERE id = ?',
+            'UPDATE urlopy SET start_date = %s, end_date = %s WHERE id = %s',
             (start, end, leave_id)
         )
         conn.commit()
@@ -196,7 +196,7 @@ def delete_leave(leave_id):
 
     user_id, role = get_current_user()
     conn = get_db_connection()
-    row = conn.execute('SELECT * FROM urlopy WHERE id = ?', (leave_id,)).fetchone()
+    row = conn.execute('SELECT * FROM urlopy WHERE id = %s', (leave_id,)).fetchone()
     if not row:
         conn.close(); abort(404)
 
@@ -208,11 +208,11 @@ def delete_leave(leave_id):
     days = (end_date - start_date).days + 1
 
     conn.execute(
-        'UPDATE users SET total_days = total_days + ? WHERE id = ?',
+        'UPDATE users SET total_days = total_days + %s WHERE id = %s',
         (days, row['user_id'])
     )
 
-    conn.execute('DELETE FROM urlopy WHERE id = ?', (leave_id,))
+    conn.execute('DELETE FROM urlopy WHERE id = %s', (leave_id,))
     conn.commit()
     conn.close()
     return redirect(url_for('vacations'))
@@ -226,7 +226,7 @@ def login():
 
         conn = get_db_connection()
         user = conn.execute(
-            "SELECT * FROM users WHERE username = ? AND password = ?",
+            "SELECT * FROM users WHERE username = %s AND password = %s",
             (username, password)
         ).fetchone()
         conn.close()
@@ -282,7 +282,7 @@ def users_new():
 
         conn = get_db_connection()
         # sprawdź, czy istnieje
-        exists = conn.execute('SELECT 1 FROM users WHERE username = ?', (username,)).fetchone()
+        exists = conn.execute('SELECT 1 FROM users WHERE username = %s', (username,)).fetchone()
         if exists:
             conn.close()
             flash("Taki login już istnieje.", "warning")
@@ -293,7 +293,7 @@ def users_new():
             total_days = annual_limit
         total_days = int(total_days)
 
-        conn.execute('INSERT INTO users (username, password, role, total_days, last_updated_year, annual_limit) VALUES (?, ?, ?, ?, ?, ?)',
+        conn.execute('INSERT INTO users (username, password, role, total_days, last_updated_year, annual_limit) VALUES (%s, %s, %s, %s, %s, %s)',
                     (username, password, role, total_days, datetime.today().year, annual_limit))
 
         conn.commit()
@@ -311,7 +311,7 @@ def users_edit(user_id):
 
 
     conn = get_db_connection()
-    user = conn.execute('SELECT id, username, role, total_days, annual_limit FROM users WHERE id = ?', (user_id,)).fetchone()
+    user = conn.execute('SELECT id, username, role, total_days, annual_limit FROM users WHERE id = %s', (user_id,)).fetchone()
 
     if not user:
         conn.close()
@@ -333,23 +333,23 @@ def users_edit(user_id):
         params = []
 
         if new_password:
-            updates.append('password = ?')
+            updates.append('password = %s')
             params.append(new_password)
 
         if total_days:
-            updates.append('total_days = ?')
+            updates.append('total_days = %s')
             params.append(int(total_days))
 
         if annual_limit:
-            updates.append('annual_limit = ?')
+            updates.append('annual_limit = %s')
             params.append(int(annual_limit))
 
-        updates.append('role = ?')
+        updates.append('role = %s')
         params.append(role)
 
         params.append(user_id)
 
-        sql = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
+        sql = f"UPDATE users SET {', '.join(updates)} WHERE id = %s"
         conn.execute(sql, params)
 
         conn.commit()
@@ -366,7 +366,7 @@ def delete_user(user_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM users WHERE id=?", (user_id,))
+    cursor.execute("SELECT * FROM users WHERE id=%s", (user_id,))
     user = cursor.fetchone()
 
     if user is None:
@@ -381,9 +381,9 @@ def delete_user(user_id):
             flash("Nie można usunąć ostatniego administratora", "danger")
             return redirect(url_for("users_list"))
 
-    cursor.execute("DELETE FROM urlopy WHERE user_id=?", (user_id,))
+    cursor.execute("DELETE FROM urlopy WHERE user_id=%s", (user_id,))
 
-    cursor.execute("DELETE FROM users WHERE id=?", (user_id,))
+    cursor.execute("DELETE FROM users WHERE id=%s", (user_id,))
     conn.commit()
     flash("Użytkownik usunięty", "success")
     return redirect(url_for("users_list"))
@@ -400,11 +400,11 @@ def stats():
     today = conn.execute("""
         SELECT users.username FROM urlopy u
         JOIN users ON u.user_id = users.id
-        WHERE date('now') BETWEEN u.start_date AND u.end_date
+        WHERE CURRENT_DATE BETWEEN u.start_date AND u.end_date
     """).fetchall()
     upcoming = conn.execute("""
         SELECT COUNT(*) FROM urlopy
-        WHERE start_date BETWEEN date('now') AND date('now', '+30 days')
+        WHERE start_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
     """).fetchone()[0]
     available_days = conn.execute("""
         SELECT username, total_days
@@ -441,8 +441,8 @@ def get_events():
     conn = get_db_connection()
     urlopy = conn.execute("""
         SELECT 
-            strftime('%Y-%m-%d', u.start_date) as start_date,
-            strftime('%Y-%m-%d', u.end_date) as end_date,
+            TO_CHAR(u.start_date, 'YYYY-MM-DD') as start_date,
+            TO_CHAR(u.end_date, 'YYYY-MM-DD') as end_date,
             users.username
         FROM urlopy u
         JOIN users ON users.id = u.user_id
