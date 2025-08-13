@@ -40,7 +40,7 @@ def add_yearly_vacation_days():
     conn = get_db_connection()
     conn.execute("""
         UPDATE users
-        SET total_days = total_days + 26,
+        SET total_days = total_days + annual_limit,
             last_updated_year = ?
         WHERE username != 'admin' AND last_updated_year < ?
     """, (current_year, current_year))
@@ -274,6 +274,7 @@ def users_new():
         username = request.form['username'].strip()
         password = request.form['password'].strip()
         role = request.form['role'].strip()  # 'admin' lub 'employee'
+        limit = int(request.form["limit"])
 
         if not username or not password or role not in ('admin','employee'):
             flash("Uzupełnij poprawnie wszystkie pola.", "danger")
@@ -289,11 +290,11 @@ def users_new():
 
         total_days = request.form.get('total_days')
         if not total_days:
-            total_days = 26
+            total_days = limit
         total_days = int(total_days)
 
-        conn.execute('INSERT INTO users (username, password, role, total_days, last_updated_year) VALUES (?, ?, ?, ?, ?)',
-                    (username, password, role, total_days, datetime.today().year))
+        conn.execute('INSERT INTO users (username, password, role, total_days, last_updated_year, annual_limit) VALUES (?, ?, ?, ?, ?, ?)',
+                    (username, password, role, total_days, datetime.today().year, limit))
 
         conn.commit()
         conn.close()
