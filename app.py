@@ -53,10 +53,14 @@ add_yearly_vacation_days()
 
 def count_workdays(start_date, end_date):
     pl_holidays = holidays.Poland()
+    extra_holidays = {
+        date(start_date.year, 12, 24),
+        date(end_date.year, 12, 24)
+    }
     day_count = 0
     current_day = start_date
     while current_day <= end_date:
-        if current_day.weekday() < 5 and current_day not in pl_holidays:
+        if current_day.weekday() < 5 and current_day not in pl_holidays and current_day not in extra_holidays:
             day_count += 1
         current_day += timedelta(days=1)
     return day_count
@@ -475,6 +479,7 @@ def stats():
         SELECT users.username FROM urlopy u
         JOIN users ON u.user_id = users.id
         WHERE CURRENT_DATE BETWEEN u.start_date AND u.end_date
+        ORDER BY users.username
     """)
     today = cur.fetchall()
 
@@ -542,7 +547,7 @@ def get_events():
 
     kolory = {
         'Natalia': "#332aac",
-        'Robert': "#379579",
+        'Robert': "#036648",
         'Klaudia': "#eeb36f",
         'Paulina': "#8065e1",
         'Asia': "#af4190",
