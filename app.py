@@ -7,6 +7,7 @@ from functools import wraps
 from datetime import timedelta, datetime, date
 import os
 import random
+import holidays
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tajny_klucz'
@@ -50,6 +51,17 @@ def add_yearly_vacation_days():
 
 add_yearly_vacation_days()
 
+def count_workdays(start_date, end_date):
+    pl_holidays = holidays.Poland()
+    day_count = 0
+    current_day = start_date
+    while current_day <= end_date:
+        if current_day.weekday() < 5 and current_day not in pl_holidays:
+            day_count += 1
+        current_day += timedelta(days=1)
+    return day_count
+
+
 
 @app.route('/add_leave', methods=['GET', 'POST'])
 def add_leave():
@@ -82,7 +94,9 @@ def add_leave():
 
         start_date = datetime.strptime(start, "%Y-%m-%d")
         end_date = datetime.strptime(end, "%Y-%m-%d")
-        days_taken = (end_date - start_date).days + 1
+        #days_taken = (end_date - start_date).days + 1
+        days_taken = count_workdays(start_date, end_date)
+
 
         cur.execute(
             'SELECT total_days FROM users WHERE id = %s', (selected_user_id,)
@@ -182,13 +196,15 @@ def edit_leave(leave_id):
             flash("Data końcowa nie może być wcześniejsza niż początkowa.", "danger")
             return redirect(url_for("edit_leave", leave_id=leave_id))
 
-        old_start = datetime.strptime(row['start_date'], "%Y-%m-%d")
-        old_end = datetime.strptime(row['end_date'], "%Y-%m-%d")
-        old_days = (old_end - old_start).days + 1
+        old_start = row['start_date']
+        old_end = row['end_date']
+        #old_days = (old_end - old_start).days + 1
+        old_days = count_workdays(old_start, old_end)
 
         new_start = datetime.strptime(start, "%Y-%m-%d")
         new_end = datetime.strptime(end, "%Y-%m-%d")
-        new_days = (new_end - new_start).days + 1
+        #new_days = (new_end - new_start).days + 1
+        new_days = count_workdays(new_start, new_end)
 
         diff = old_days - new_days
         cur.execute(
@@ -227,9 +243,10 @@ def delete_leave(leave_id):
     if role != 'admin' and row['user_id'] != user_id:
         cur.close(); conn.close(); abort(403)
 
-    start_date = datetime.strptime(row['start_date'], "%Y-%m-%d")
-    end_date = datetime.strptime(row['end_date'], "%Y-%m-%d")
-    days = (end_date - start_date).days + 1
+    start_date = row['start_date']
+    end_date = row['end_date']
+    #days = (end_date - start_date).days + 1
+    days = count_workdays(start_date, end_date)
 
     cur.execute(
         'UPDATE users SET total_days = total_days + %s WHERE id = %s',
