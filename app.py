@@ -432,7 +432,7 @@ def delete_user(user_id):
 
     if user["role"] == "admin":
         cursor.execute("SELECT COUNT(*) FROM users WHERE role='admin'")
-        admin_count = cursor.fetchone()[0]
+        admin_count = cursor.fetchone()['count']
 
         if admin_count <= 1:
             flash("Nie można usunąć ostatniego administratora", "danger")
@@ -465,7 +465,7 @@ def stats():
         SELECT COUNT(*) FROM urlopy
         WHERE start_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
     """)
-    upcoming = cur.fetchone()[0]
+    upcoming = cur.fetchone()['count']
 
     cur.execute("""
         SELECT username, total_days
