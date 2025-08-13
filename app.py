@@ -38,7 +38,8 @@ def admin_only(f):
 def add_yearly_vacation_days():
     current_year = datetime.today().year
     conn = get_db_connection()
-    conn.execute("""
+    cur = conn.cursor()
+    cur.execute("""
         UPDATE users
         SET total_days = total_days + annual_limit,
             last_updated_year = %s
