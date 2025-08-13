@@ -52,6 +52,8 @@ def add_yearly_vacation_days():
 add_yearly_vacation_days()
 
 def count_workdays(start_date, end_date):
+    start_date = start_date.date() if hasattr(start_date, "date") else start_date
+    end_date = end_date.date() if hasattr(end_date, "date") else end_date
     pl_holidays = holidays.Poland()
     extra_holidays = {
         date(start_date.year, 12, 24),
