@@ -541,13 +541,13 @@ def get_events():
     conn.close()
 
     kolory = {
-        'Natalia': 'blue',
-        'Robert': 'green',
-        'Klaudia': 'orange',
-        'Paulina': 'purple',
-        'Asia': 'pink',
-        'Sylwia': 'yellow',
-        'Zarząd': 'red',
+        'Natalia': "#332aac",
+        'Robert': "#379579",
+        'Klaudia': "#eeb36f",
+        'Paulina': "#8065e1",
+        'Asia': "#af4190",
+        'Sylwia': "#3b7396",
+        'Zarząd': "#b1464a",
         'admin': 'gray'
     }
 

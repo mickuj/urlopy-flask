@@ -22,7 +22,7 @@
     <h4 style="font-family: 'Mulish', sans-serif;">📆 Urlopy trwające dzisiaj:</h4>
     <ul class="list-group">
       {% for row in today %}
-        <li class="list-group-item" style="font-family: 'Mulish', sans-serif;">{{ row[0] }}</li>
+        <li class="list-group-item" style="font-family: 'Mulish', sans-serif;">{{ row['username'] }}</li>
       {% else %}
         <li class="list-group-item" style="font-family: 'Mulish', sans-serif;">Brak</li>
       {% endfor %}
