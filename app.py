@@ -58,10 +58,12 @@ def add_leave():
 
     user_id, role = get_current_user()
     conn = get_db_connection()
+    cur = conn.cursor()
 
     users = []
     if role == 'admin':
-        users = conn.execute("SELECT id, username FROM users WHERE role != 'admin' ORDER BY username").fetchall()
+        cur.execute("SELECT id, username FROM users WHERE role != 'admin' ORDER BY username")
+        users = cur.fetchall()
 
     if request.method == 'POST':
         start = request.form['start_date']
@@ -73,6 +75,7 @@ def add_leave():
             selected_user_id = user_id
 
         if end < start:
+            cur.close()
             conn.close()
             flash(f"Data końcowa nie może być wcześniejsza niż początkowa.", "danger")
             return redirect(url_for("add_leave"))
@@ -81,34 +84,39 @@ def add_leave():
         end_date = datetime.strptime(end, "%Y-%m-%d")
         days_taken = (end_date - start_date).days + 1
 
-        current_days = conn.execute(
+        cur.execute(
             'SELECT total_days FROM users WHERE id = %s', (selected_user_id,)
-        ).fetchone()['total_days']
+        )
+        current_days = cur.fetchone()['total_days']
 
         if current_days < days_taken:
+            cur.close()
             conn.close()
             flash(f"Nie masz wystarczającej liczby dni urlopowych (pozostało {current_days}).", "danger")
             return redirect(url_for("add_leave"))
 
-        conn.execute(
+        cur.execute(
             'INSERT INTO urlopy (user_id, start_date, end_date) VALUES (%s, %s, %s)',
             (selected_user_id, start, end)
         )
 
-        conn.execute(
+        cur.execute(
             'UPDATE users SET total_days = total_days - %s WHERE id = %s',
             (days_taken, selected_user_id)
         )
 
         conn.commit()
+        cur.close()
         conn.close()
         return redirect(url_for('vacations'))
 
     # Pokaż dotychczasowe urlopy (dla danego użytkownika)
-    leaves = conn.execute(
+    cur.execute(
         'SELECT start_date, end_date FROM urlopy WHERE user_id = %s ORDER BY start_date',
         (user_id,)
-    ).fetchall()
+    )
+    leaves = cur.fetchall()
+    cur.close()
     conn.close()
 
     return render_template('add_leave.html', leaves=leaves, users=users, role=role)
@@ -121,25 +129,31 @@ def vacations():
         return redirect(url_for('login'))
 
     user_id, role = get_current_user()
-
     today = date.today().isoformat()
 
     conn = get_db_connection()
-    rows = conn.execute('''
+    cur = conn.cursor()
+
+    cur.execute('''
         SELECT u.id, u.user_id, u.start_date, u.end_date,
                COALESCE(us.username, 'użytkownik') AS username
         FROM urlopy u
         LEFT JOIN users us ON us.id = u.user_id
         WHERE u.end_date >= %s
         ORDER BY u.start_date
-    ''', (today,)).fetchall()
+    ''', (today,))
+    rows = cur.fetchall()
+
+    cur.close()
     conn.close()
+
     return render_template(
         'vacations.html',
         leaves=rows,
         current_user_id=user_id,
         is_admin=(role == 'admin')
     )
+
 
 
 @app.route('/leave/edit/<int:leave_id>', methods=['GET','POST'])
@@ -149,20 +163,23 @@ def edit_leave(leave_id):
 
     user_id, role = get_current_user()
     conn = get_db_connection()
-    row = conn.execute('SELECT * FROM urlopy WHERE id = %s', (leave_id,)).fetchone()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute('SELECT * FROM urlopy WHERE id = %s', (leave_id,))
+    row = cur.fetchone()
     if not row:
-        conn.close(); abort(404)
+        cur.close(); conn.close(); abort(404)
 
     if role != 'admin' and row['user_id'] != user_id:
-        conn.close(); abort(403)
+        cur.close(); conn.close(); abort(403)
 
     if request.method == 'POST':
         start = request.form['start_date']
         end = request.form['end_date']
 
         if end < start:
-            conn.close()
-            flash(f"Data końcowa nie może być wcześniejsza niż początkowa.", "danger")
+            cur.close(); conn.close()
+            flash("Data końcowa nie może być wcześniejsza niż początkowa.", "danger")
             return redirect(url_for("edit_leave", leave_id=leave_id))
 
         old_start = datetime.strptime(row['start_date'], "%Y-%m-%d")
@@ -174,21 +191,23 @@ def edit_leave(leave_id):
         new_days = (new_end - new_start).days + 1
 
         diff = old_days - new_days
-        conn.execute(
+        cur.execute(
             'UPDATE users SET total_days = total_days + %s WHERE id = %s',
             (diff, row['user_id'])
         )
 
-        conn.execute(
+        cur.execute(
             'UPDATE urlopy SET start_date = %s, end_date = %s WHERE id = %s',
             (start, end, leave_id)
         )
+
         conn.commit()
-        conn.close()
+        cur.close(); conn.close()
         return redirect(url_for('vacations'))
 
-    conn.close()
+    cur.close(); conn.close()
     return render_template('edit_leave.html', leave=row)
+
 
 @app.route('/leave/delete/<int:leave_id>')
 def delete_leave(leave_id):
@@ -197,39 +216,52 @@ def delete_leave(leave_id):
 
     user_id, role = get_current_user()
     conn = get_db_connection()
-    row = conn.execute('SELECT * FROM urlopy WHERE id = %s', (leave_id,)).fetchone()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute('SELECT * FROM urlopy WHERE id = %s', (leave_id,))
+    row = cur.fetchone()
+
     if not row:
-        conn.close(); abort(404)
+        cur.close(); conn.close(); abort(404)
 
     if role != 'admin' and row['user_id'] != user_id:
-        conn.close(); abort(403)
+        cur.close(); conn.close(); abort(403)
 
     start_date = datetime.strptime(row['start_date'], "%Y-%m-%d")
     end_date = datetime.strptime(row['end_date'], "%Y-%m-%d")
     days = (end_date - start_date).days + 1
 
-    conn.execute(
+    cur.execute(
         'UPDATE users SET total_days = total_days + %s WHERE id = %s',
         (days, row['user_id'])
     )
 
-    conn.execute('DELETE FROM urlopy WHERE id = %s', (leave_id,))
+    cur.execute('DELETE FROM urlopy WHERE id = %s', (leave_id,))
     conn.commit()
+
+    cur.close()
     conn.close()
+
     return redirect(url_for('vacations'))
 
 
-@app.route('/login', methods=['GET','POST'])
+
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username'].strip()
         password = request.form['password'].strip()
 
         conn = get_db_connection()
-        user = conn.execute(
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cur.execute(
             "SELECT * FROM users WHERE username = %s AND password = %s",
             (username, password)
-        ).fetchone()
+        )
+        user = cur.fetchone()
+
+        cur.close()
         conn.close()
 
         if user:
@@ -240,6 +272,7 @@ def login():
             return render_template('login.html', error="Nieprawidłowy login lub hasło")
 
     return render_template('login.html')
+
 
 @app.route('/logout')
 def logout():
@@ -260,31 +293,42 @@ def users_list():
         return redirect(url_for("login"))
 
     conn = get_db_connection()
-    rows = conn.execute('SELECT id, username, role, total_days, annual_limit FROM users ORDER BY username COLLATE NOCASE').fetchall()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute('SELECT id, username, role, total_days, annual_limit FROM users ORDER BY username')
+    rows = cur.fetchall()
+
+    cur.close()
     conn.close()
+
     return render_template('users.html', users=rows)
 
-@app.route('/users/new', methods=['GET','POST'])
+
+@app.route('/users/new', methods=['GET', 'POST'])
 def users_new():
     if "user_id" not in session or session.get("role") != "admin":
         flash("Dostęp tylko dla administratora", "danger")
         return redirect(url_for("login"))
 
-
     if request.method == 'POST':
         username = request.form['username'].strip()
         password = request.form['password'].strip()
-        role = request.form['role'].strip()  # 'admin' lub 'employee'
+        role = request.form['role'].strip()
         annual_limit = int(request.form["annual_limit"])
 
-        if not username or not password or role not in ('admin','employee'):
+        if not username or not password or role not in ('admin', 'employee'):
             flash("Uzupełnij poprawnie wszystkie pola.", "danger")
             return redirect(url_for('users_new'))
 
         conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
         # sprawdź, czy istnieje
-        exists = conn.execute('SELECT 1 FROM users WHERE username = %s', (username,)).fetchone()
+        cur.execute('SELECT 1 FROM users WHERE username = %s', (username,))
+        exists = cur.fetchone()
+
         if exists:
+            cur.close()
             conn.close()
             flash("Taki login już istnieje.", "warning")
             return redirect(url_for('users_new'))
@@ -294,27 +338,35 @@ def users_new():
             total_days = annual_limit
         total_days = int(total_days)
 
-        conn.execute('INSERT INTO users (username, password, role, total_days, last_updated_year, annual_limit) VALUES (%s, %s, %s, %s, %s, %s)',
-                    (username, password, role, total_days, datetime.today().year, annual_limit))
+        cur.execute('''
+            INSERT INTO users (username, password, role, total_days, last_updated_year, annual_limit)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (username, password, role, total_days, datetime.today().year, annual_limit))
 
         conn.commit()
+        cur.close()
         conn.close()
+
         flash("Użytkownik dodany.", "success")
         return redirect(url_for('users_list'))
 
     return render_template('user_form.html', mode='new', user=None)
 
-@app.route('/users/<int:user_id>/edit', methods=['GET','POST'])
+
+@app.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
 def users_edit(user_id):
     if "user_id" not in session or session.get("role") != "admin":
         flash("Dostęp tylko dla administratora", "danger")
         return redirect(url_for("login"))
 
-
     conn = get_db_connection()
-    user = conn.execute('SELECT id, username, role, total_days, annual_limit FROM users WHERE id = %s', (user_id,)).fetchone()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute('SELECT id, username, role, total_days, annual_limit FROM users WHERE id = %s', (user_id,))
+    user = cur.fetchone()
 
     if not user:
+        cur.close()
         conn.close()
         abort(404)
 
@@ -324,8 +376,8 @@ def users_edit(user_id):
         total_days = request.form.get('total_days')
         annual_limit = request.form.get('annual_limit')
 
-
-        if role not in ('admin','employee'):
+        if role not in ('admin', 'employee'):
+            cur.close()
             conn.close()
             flash("Nieprawidłowa rola.", "danger")
             return redirect(url_for('users_edit', user_id=user_id))
@@ -351,15 +403,19 @@ def users_edit(user_id):
         params.append(user_id)
 
         sql = f"UPDATE users SET {', '.join(updates)} WHERE id = %s"
-        conn.execute(sql, params)
+        cur.execute(sql, params)
 
         conn.commit()
+        cur.close()
         conn.close()
+
         flash("Zapisano zmiany.", "success")
         return redirect(url_for('users_list'))
 
+    cur.close()
     conn.close()
     return render_template('user_form.html', mode='edit', user=user)
+
 
 @app.route("/users/<int:user_id>/delete", methods=["POST"])
 @admin_only
@@ -392,28 +448,34 @@ def delete_user(user_id):
 
 @app.route('/stats')
 def stats():
-    # if session.get("role") != "admin":
-    #     flash("Tylko dla administratora", "danger")
-    #     return redirect(url_for("login"))
-
     conn = get_db_connection()
-    total = conn.execute("SELECT COUNT(*) FROM urlopy").fetchone()[0]
-    today = conn.execute("""
+    cur = conn.cursor()
+
+    cur.execute("SELECT COUNT(*) FROM urlopy")
+    total = cur.fetchone()[0]
+
+    cur.execute("""
         SELECT users.username FROM urlopy u
         JOIN users ON u.user_id = users.id
         WHERE CURRENT_DATE BETWEEN u.start_date AND u.end_date
-    """).fetchall()
-    upcoming = conn.execute("""
+    """)
+    today = cur.fetchall()
+
+    cur.execute("""
         SELECT COUNT(*) FROM urlopy
         WHERE start_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
-    """).fetchone()[0]
-    available_days = conn.execute("""
+    """)
+    upcoming = cur.fetchone()[0]
+
+    cur.execute("""
         SELECT username, total_days
         FROM users
         WHERE role != 'admin'
         ORDER BY username
-    """).fetchall()
+    """)
+    available_days = cur.fetchall()
 
+    cur.close()
     conn.close()
 
     return render_template("stats.html", total=total, today=today, upcoming=upcoming, available_days=available_days)
@@ -421,10 +483,15 @@ def stats():
 @app.route('/calendar')
 def calendar():
     conn = get_db_connection()
-    rows = conn.execute("""
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute("""
         SELECT u.start_date, u.end_date, users.username
         FROM urlopy u JOIN users ON u.user_id = users.id
-    """).fetchall()
+    """)
+    rows = cur.fetchall()
+
+    cur.close()
     conn.close()
 
     events = []
@@ -437,17 +504,23 @@ def calendar():
 
     return render_template("calendar.html", events=events)
 
+
 @app.route("/api/events")
 def get_events():
     conn = get_db_connection()
-    urlopy = conn.execute("""
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute("""
         SELECT 
             TO_CHAR(u.start_date, 'YYYY-MM-DD') as start_date,
             TO_CHAR(u.end_date, 'YYYY-MM-DD') as end_date,
             users.username
         FROM urlopy u
         JOIN users ON users.id = u.user_id
-    """).fetchall()
+    """)
+    urlopy = cur.fetchall()
+
+    cur.close()
     conn.close()
 
     kolory = {
@@ -481,6 +554,7 @@ def get_events():
         })
 
     return jsonify(events)
+
 
 
 
