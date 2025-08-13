@@ -5,6 +5,7 @@ from flask import g
 from functools import wraps
 from datetime import timedelta, datetime, date
 import os
+import random
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tajny_klucz'
@@ -438,14 +439,36 @@ def get_events():
     """).fetchall()
     conn.close()
 
+    kolory = {
+        'Natalia': 'blue',
+        'Robert': 'green',
+        'Klaudia': 'orange',
+        'Paulina': 'purple',
+        'Asia': 'pink',
+        'Sylwia': 'yellow',
+        'Zarząd': 'red',
+        'admin': 'gray'
+    }
+
+    losowe_kolory = [
+        '#f8c291', '#82ccdd', '#b8e994',
+        '#f6e58d', '#ffbe76', '#dff9fb',
+        '#c7ecee', '#fad390', '#f9ca24'
+    ]
+
     events = []
     for u in urlopy:
+        nazwa = u['username']
+        if nazwa not in kolory:
+            kolory[nazwa] = random.choice(losowe_kolory)
+        kolor = kolory[nazwa]
         events.append({
-            "title": f"{u['username']}",
+            "title": f"{nazwa}",
             "start": u["start_date"],
             "end": (datetime.strptime(u["end_date"], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d"),
-            "color": "blue"
+            "color": kolor
         })
+
     return jsonify(events)
 
 
