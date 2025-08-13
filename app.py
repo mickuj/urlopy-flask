@@ -452,7 +452,7 @@ def stats():
     cur = conn.cursor()
 
     cur.execute("SELECT COUNT(*) FROM urlopy")
-    total = cur.fetchone()[0]
+    total = cur.fetchone()['count']
 
     cur.execute("""
         SELECT users.username FROM urlopy u
