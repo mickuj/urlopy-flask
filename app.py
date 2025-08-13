@@ -274,7 +274,7 @@ def users_new():
         username = request.form['username'].strip()
         password = request.form['password'].strip()
         role = request.form['role'].strip()  # 'admin' lub 'employee'
-        limit = int(request.form["limit"])
+        annual_limit = int(request.form["annual_limit"])
 
         if not username or not password or role not in ('admin','employee'):
             flash("Uzupełnij poprawnie wszystkie pola.", "danger")
@@ -290,11 +290,11 @@ def users_new():
 
         total_days = request.form.get('total_days')
         if not total_days:
-            total_days = limit
+            total_days = annual_limit
         total_days = int(total_days)
 
         conn.execute('INSERT INTO users (username, password, role, total_days, last_updated_year, annual_limit) VALUES (?, ?, ?, ?, ?, ?)',
-                    (username, password, role, total_days, datetime.today().year, limit))
+                    (username, password, role, total_days, datetime.today().year, annual_limit))
 
         conn.commit()
         conn.close()
