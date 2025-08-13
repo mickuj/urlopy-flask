@@ -420,7 +420,7 @@ def users_edit(user_id):
 @app.route("/users/<int:user_id>/delete", methods=["POST"])
 @admin_only
 def delete_user(user_id):
-    conn = get_db()
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM users WHERE id=%s", (user_id,))
